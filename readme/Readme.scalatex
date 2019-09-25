@@ -1,0 +1,69 @@
+@import Main._
+@import scalatex.site._
+
+@raw("""<script async src="https://www.googletagmanager.com/gtag/js?id=UA-145815618-1"></script>""")
+
+@script
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'UA-145815618-1');
+
+@a(
+  href:="https://github.com/scalalandio/log4effect",
+  position.absolute,
+  top:=0,right:=0,border:=0,
+  img(
+    src:="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png",
+    alt:="Fork me on GitHub"
+  )
+)
+
+@sect("log4effect", "Cats Effect syntax for logging")
+  @sect{Getting started}
+    @p
+      Library is available for Scala 2.11, 2.12, 2.13.
+    @p
+      Add it with:
+    @hl.scala
+      libraryDependencies += "io.scalaland" %% "log4effect" % log4EffectVersion
+
+  @sect{Usage}
+    @sect{General mechanism}
+      @p
+        Logging is done using @code{Logged} type class:
+      @hl.scala
+        import cats.effect.Sync
+        import io.scalaland.log4effect.Logged
+
+        def operation[F[_]: Sync: Logged] = for {
+          a <- Sync[F].defer(1 + 1)
+          b <- Sync[F].defer(2 + 2)
+          _ <- Logged[F].info(s"a = $a b=$b")
+        } yield a -> b
+      @p
+        If you want you can use interpolator syntax - it assumes that there is
+        @code{cats.Show} instance for any value that you use in it.
+      @hl.scala
+        import cats.implicits._
+        import io.scalaland.log4effect.Logged
+        import io.scalaland.log4effect.syntax._
+
+        val i = 1
+        val d = 1.0
+        val s = "test"
+
+        def logs[F[_]: Monad: Logged] = for {
+          _ <- trace"$i $d $s"[F]
+          _ <- trace"$i $d $s".withEx[F](new Exception("with ex"))
+          _ <- debug"$i $d $s"[F]
+          _ <- debug"$i $d $s".withEx[F](new Exception("with ex"))
+          _ <- info"$i $d $s"[F]
+          _ <- info"$i $d $s".withEx[F](new Exception("with ex"))
+          _ <- warn"$i $d $s"[F]
+          _ <- warn"$i $d $s".withEx[F](new Exception("with ex"))
+          _ <- error"$i $d $s"[F]
+          _ <- error"$i $d $s".withEx[F](new Exception("with ex"))
+        } yield ()
+      @p
+        If there is no @code{cats.Show} you'd have to call @code{.toString} explicitly.

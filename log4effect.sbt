@@ -21,5 +21,20 @@ lazy val core = project.from("core")
     Seq(file)
   })
 
+lazy val readme = scalatex.ScalatexReadme(
+  projectId = "readme",
+  wd        = file(""),
+  url       = "https://github.com/scalalandio/log4effect/tree/master",
+  source    = "Readme"
+)
+  .configureModule
+  .noPublish
+  .enablePlugins(GhpagesPlugin)
+  .settings(
+    siteSourceDirectory := target.value / "scalatex",
+    git.remoteRepo := "git@github.com:scalalandio/log4effect.git",
+    Jekyll / makeSite / includeFilter := new FileFilter { def accept(p: File) = true }
+  )
+
 addCommandAlias("fullTest", ";test;scalastyle")
 addCommandAlias("fullCoverageTest", ";coverage;test;coverageReport;coverageAggregate;scalastyle")
