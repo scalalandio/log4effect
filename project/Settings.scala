@@ -17,8 +17,9 @@ object Settings extends Dependencies {
   private val commonSettings = Seq(
     organization := "io.scalaland",
 
-    scalaOrganization := scalaOrganizationUsed,
-    scalaVersion      := scalaVersionUsed,
+    scalaOrganization  := scalaOrganizationUsed,
+    scalaVersion       := scalaVersionUsed,
+    crossScalaVersions := crossScalaVersionsUsed,
 
     scalafmtVersion := scalaFmtVersionUsed
   )
@@ -40,7 +41,9 @@ object Settings extends Dependencies {
       "-language:implicitConversions",
       "-language:postfixOps",
       // private options
+      "-Xexperimental",
       "-Ybackend-parallelism", "8",
+      //"-Ymacro-annotations",
       "-Yno-adapted-args",
       "-Ypartial-unification",
       // warnings
@@ -52,19 +55,15 @@ object Settings extends Dependencies {
       "-Ywarn-nullary-override",
       "-Ywarn-nullary-unit",
       "-Ywarn-numeric-widen",
-      "-Ywarn-unused:implicits",
-      "-Ywarn-unused:imports",
-      "-Ywarn-unused:locals",
-      "-Ywarn-unused:params",
-      "-Ywarn-unused:patvars",
-      "-Ywarn-unused:privates",
+      //"-Ywarn-unused:implicits",
+      //"-Ywarn-unused:patvars",
+      //"-Ywarn-unused:privates",
       "-Ywarn-value-discard",
       // advanced options
       "-Xcheckinit",
       "-Xfatal-warnings",
       "-Xfuture",
       // linting
-      "-Xlint",
       "-Xlint:adapted-args",
       "-Xlint:by-name-right-associative",
       "-Xlint:constant",
@@ -72,7 +71,7 @@ object Settings extends Dependencies {
       "-Xlint:doc-detached",
       "-Xlint:inaccessible",
       "-Xlint:infer-any",
-      "-Xlint:missing-interpolator",
+      //"-Xlint:missing-interpolator",
       "-Xlint:nullary-override",
       "-Xlint:nullary-unit",
       "-Xlint:option-implicit",
@@ -82,23 +81,50 @@ object Settings extends Dependencies {
       "-Xlint:stars-align",
       "-Xlint:type-parameter-shadow",
       "-Xlint:unsound-match"
+    ).filterNot(
+      (if (scalaVersion.value.startsWith("2.13")) Set(
+        // removed in 2.13.x
+        "-Yno-adapted-args",
+        "-Ypartial-unification",
+        "-Ywarn-inaccessible",
+        "-Ywarn-infer-any",
+        "-Ywarn-nullary-override",
+        "-Ywarn-nullary-unit",
+        "-Xlint:by-name-right-associative",
+        "-Xlint:unsound-match",
+        "-Xfuture",
+        // only for 2.11.x
+        "-Xexperimental"
+      ) else if (scalaVersion.value.startsWith("2.12")) Set(
+        // added in 2.13.x
+        //"-Ymacro-annotations",
+        // only for 2.11.x
+        "-Xexperimental"
+      ) else if (scalaVersion.value.startsWith("2.11")) Set(
+        // added in 2.13.x
+        //"-Ymacro-annotations",
+        // added in 2.12.x
+        "-Ybackend-parallelism", "8",
+        "-Ywarn-extra-implicit",
+        "-Ywarn-macros:after",
+        "-Ywarn-unused:implicits",
+        "-Ywarn-unused:patvars",
+        "-Ywarn-unused:privates",
+        "-Xlint:constant"
+      ) else Set.empty[String]).contains _
     ),
-    Compile / console / scalacOptions := Seq(
-      // standard settings
-      "-target:jvm-1.8",
-      "-encoding", "UTF-8",
-      "-unchecked",
-      "-deprecation",
-      "-explaintypes",
-      "-feature",
-      // language features
-      "-language:existentials",
-      "-language:higherKinds",
-      "-language:implicitConversions",
-      "-language:postfixOps",
-      // private options
-      "-Yno-adapted-args",
-      "-Ypartial-unification"
+    console / scalacOptions --= Seq(
+      // warnings
+      "-Ywarn-unused:implicits",
+      "-Ywarn-unused:imports",
+      "-Ywarn-unused:locals",
+      "-Ywarn-unused:params",
+      "-Ywarn-unused:patvars",
+      "-Ywarn-unused:privates",
+      // advanced options
+      "-Xfatal-warnings",
+      // linting
+      "-Xlint"
     ),
 
     Global / cancelable := true,
@@ -129,17 +155,49 @@ object Settings extends Dependencies {
     )
   )
 
-  implicit final class RunConfigurator(project: Project) {
+  private val publishSettings = Seq(
+    homepage := Some(url("https://scalaland.io")),
+    licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
+    scmInfo := Some(
+      ScmInfo(url("https://github.com/scalalandio/log4effect"), "scm:git:git@github.com:scalalandio/log4effect.git")
+    ),
+    publishTo := {
+      val nexus = "https://oss.sonatype.org/"
+      if (isSnapshot.value)
+        Some("snapshots" at nexus + "content/repositories/snapshots")
+      else
+        Some("releases" at nexus + "service/local/staging/deploy/maven2")
+    },
+    publishMavenStyle := true,
+    publishArtifact in Test := false,
+    pomIncludeRepository := { _ =>
+      false
+    },
+    pomExtra :=
+      <developers>
+        <developer>
+          <id>krzemin</id>
+          <name>Piotr Krzemiński</name>
+          <url>https://github.com/krzemin</url>
+        </developer>
+        <developer>
+          <id>MateuszKubuszok</id>
+          <name>Mateusz Kubuszok</name>
+          <url>https://github.com/MateuszKubuszok</url>
+        </developer>
+      </developers>
+  )
 
-    def configureRun(main: String): Project = project
-      .settings(inTask(assembly)(Seq(
-        assemblyJarName := s"${name.value}.jar",
-        assemblyMergeStrategy := {
-          case strategy => MergeStrategy.defaultMergeStrategy(strategy)
-        },
-        mainClass := Some(main)
-      )))
-      .settings(Compile / run / mainClass := Some(main))
+  private val noPublishSettings =
+    Seq(skip in publish := true, publishArtifact := false)
+
+  implicit class PublishConfigurator(project: Project) {
+
+    def publish: Project = project
+      .settings(publishSettings)
+
+    def noPublish: Project = project
+      .settings(noPublishSettings)
   }
 
   sealed abstract class TestConfigurator(project: Project, config: Configuration) {
